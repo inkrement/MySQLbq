@@ -1,5 +1,5 @@
 # Readme
-This is a CLI tool (written in Python) that allows you to load your data from Mysql to Google BigQuery. Allthough, I tried to optimize it for speed, there are some TODOs left. The script is based on [Ryan's import script](http://stackoverflow.com/a/28049671/609712).
+This is a CLI tool (written in Python) that allows you to load your data from Mysql to Google BigQuery. Although, I tried to optimize it for speed, there are some TODOs left. The script is based on [Ryan's import script](http://stackoverflow.com/a/28049671/609712).
 
 ## Requirements
 
