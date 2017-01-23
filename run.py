@@ -74,6 +74,7 @@ def bq_load(table, data, max_retries=5):
             num_tries += 1
             logging.error('insert failed with exception trying again retry %d', num_tries )
         except Exception as e:
+            num_tries += 1
             for row in insertResponse:
                 if 'errors' in row:
                     logging.error('not able to upload data: %s', row['errors'])
