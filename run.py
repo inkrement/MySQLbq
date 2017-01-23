@@ -4,10 +4,8 @@ import logging
 import os
 from MySQLdb.converters import conversions
 
-import pprint
-
 MYSQL_HOST='127.0.0.1'
-MYSQL_DATABASE='amazon'
+MYSQL_DATABASE='youtube'
 MYSQL_USER='root'
 MYSQL_PASSWORD=''
 
@@ -123,7 +121,6 @@ def SQLToBQBatch(table, limit=0):
         logging.info("Running: %s", sqlCommand)
         cursor.execute(sqlCommand)
         data = []
-        import pprint
 
         for _, row in enumerate(cursor.fetchall()):
             data.append(row)
@@ -133,7 +130,6 @@ def SQLToBQBatch(table, limit=0):
 
         if count != 0:
             logging.info("Sending request")
-            pprint.pprint(data)
             insertResponse = bq_table.insert_data(data)
 
             for row in insertResponse:
