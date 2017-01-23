@@ -6,6 +6,7 @@ import logging
 import os
 from MySQLdb.converters import conversions
 import click
+import MySQLdb.cursors
 
 bqTypeDict = { 'int' : 'INTEGER',
                'varchar' : 'STRING',
@@ -34,13 +35,15 @@ def Connect(host, database, user, password):
     ## fix conversion. datetime as str and not datetime object
     conv=conversions.copy()
     conv[12]=conv_date_to_timestamp
-    return MySQLdb.connect(host=host, db=database, user=user, passwd=password, conv=conv)
+    return MySQLdb.connect(host=host, db=database, user=user, passwd=password, conv=conv, cursorclass=MySQLdb.cursors.SSCursor)
 
 
 def BuildSchema(host, database, user, password, table):
+    logging.debug('build schema for table %s in database %s' % (table, database))
     conn = Connect(host, database, user, password)
     cursor = conn.cursor()
     cursor.execute("DESCRIBE %s;" % table)
+
     tableDecorator = cursor.fetchall()
     schema = []
 
@@ -56,6 +59,14 @@ def BuildSchema(host, database, user, password, table):
 
     return tuple(schema)
 
+
+def bq_load(table, data):
+    logging.info("Sending request")
+    insertResponse = table.insert_data(data)
+
+    for row in insertResponse:
+        if 'errors' in row:
+            logging.error('not able to upload data: %s', row['errors'])
 
 @click.command()
 @click.option('-h', '--host', default='127.0.0.1', help='MySQL hostname')
@@ -74,25 +85,19 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
     bigquery_client = bigquery.Client()
 
     try:
-        # Prepares the new dataset
-        if dataset == '':
-            dataset = database
-
-        dataset = bigquery_client.dataset(dataset)
+        bq_dataset = bigquery_client.dataset(dataset)
 
         # Creates the new dataset
-        dataset.create()
-
+        bq_dataset.create()
         logging.info("Added Dataset")
     except Exception, e:
-        logging.info(e)
         if ("Already Exists: " in str(e)):
             logging.info("Dataset already exists")
         else:
             logging.error("Error creating dataset: %s Error", str(e))
 
     try:
-        bq_table = dataset.table(table)
+        bq_table = bq_dataset.table(table)
         bq_table.schema = BuildSchema(host, database, user, password, table)
         bq_table.create()
 
@@ -108,43 +113,34 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
     cursor = conn.cursor()
 
     logging.info("Starting load loop")
-    count = -1
-    cur_pos = 0
-    total = 0
+    cursor.execute("SELECT * FROM %s" % (table))
 
-    while count != 0 and (cur_pos < limit or limit == 0):
-        count = 0
-        if batch_size + cur_pos > limit and limit != 0:
-            batch_size = limit - cur_pos
-        sqlCommand = "SELECT * FROM %s LIMIT %i, %i" % (table, cur_pos, batch_size)
-        logging.info("Running: %s", sqlCommand)
-        cursor.execute(sqlCommand)
-        data = []
+    cur_batch = []
+    count = 0
 
-        for _, row in enumerate(cursor.fetchall()):
-            data.append(row)
-            count += 1
+    for row in cursor:
+        count += 1
+        #elem = tuple(row.values())
+        #import pprint
+        #pprint.pprint(elem)
 
-        logging.info("Read complete")
+        cur_batch.append(row)
 
-        if count != 0:
-            logging.info("Sending request")
-            insertResponse = bq_table.insert_data(data)
+        if count % batch_size == 0 and count != 0:
+            bq_load(bq_table, cur_batch)
 
-            for row in insertResponse:
-                if 'errors' in row:
-                    logging.error('not able to upload data: %s', row['errors'])
+            cur_batch = []
+            logging.info("Done %i, Total: %i", count, cursor.rowcount)
 
-            cur_pos += batch_size
-            total += count
-            logging.info("Done %i, Total: %i", count, total)
-        else:
-            logging.info("No more rows")
+    # send last elements
+    bq_load(bq_table, cur_batch)
+    logging.info("Finished (%i total)", count)
+
 
 
 if __name__ == '__main__':
     ## set logging
-    logging.basicConfig(level=logging.ERROR)
+    logging.basicConfig(level=logging.DEBUG)
 
     ## set env key to authenticate application
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "%s/%s" % (os.path.dirname(os.path.abspath(__file__)), 'google_key.json')
