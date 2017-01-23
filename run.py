@@ -120,17 +120,13 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
 
     for row in cursor:
         count += 1
-        #elem = tuple(row.values())
-        #import pprint
-        #pprint.pprint(elem)
-
         cur_batch.append(row)
 
         if count % batch_size == 0 and count != 0:
             bq_load(bq_table, cur_batch)
 
             cur_batch = []
-            logging.info("Done %i, Total: %i", count, cursor.rowcount)
+            logging.info("processed %i rows", count)
 
     # send last elements
     bq_load(bq_table, cur_batch)
