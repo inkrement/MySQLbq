@@ -1,4 +1,7 @@
 
+## Requirements
+
+sudo apt-get install libmysqlclient-dev
 
 # install google cloud sdk
 ```

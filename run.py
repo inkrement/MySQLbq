@@ -1,22 +1,11 @@
+#!/usr/bin/env python
+
 import MySQLdb
 from google.cloud import bigquery
 import logging
 import os
 from MySQLdb.converters import conversions
-
-MYSQL_HOST='127.0.0.1'
-MYSQL_DATABASE='youtube'
-MYSQL_USER='root'
-MYSQL_PASSWORD=''
-
-PROJECT_ID = "ceremonial-hold-156112"
-DATASET_ID = "youtube"
-
-## set logging
-logging.basicConfig(level=logging.ERROR)
-
-## set env key to authenticate application
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "%s/%s" % (os.path.dirname(os.path.abspath(__file__)), 'google_key.json')
+import click
 
 bqTypeDict = { 'int' : 'INTEGER',
                'varchar' : 'STRING',
@@ -32,8 +21,6 @@ bqTypeDict = { 'int' : 'INTEGER',
                'datetime' : 'TIMESTAMP'
               }
 
-from MySQLdb.times import DateTime2literal
-
 def conv_date_to_timestamp(str_date):
     import time
     import datetime
@@ -43,15 +30,15 @@ def conv_date_to_timestamp(str_date):
 
     return unix_timestamp
 
-def Connect():
+def Connect(host, database, user, password):
     ## fix conversion. datetime as str and not datetime object
     conv=conversions.copy()
     conv[12]=conv_date_to_timestamp
-    return MySQLdb.connect(host=MYSQL_HOST, db=MYSQL_DATABASE, user=MYSQL_USER, passwd=MYSQL_PASSWORD, conv=conv)
+    return MySQLdb.connect(host=host, db=database, user=user, passwd=password, conv=conv)
 
 
-def BuildSchema(table):
-    conn = Connect()
+def BuildSchema(host, database, user, password, table):
+    conn = Connect(host, database, user, password)
     cursor = conn.cursor()
     cursor.execute("DESCRIBE %s;" % table)
     tableDecorator = cursor.fetchall()
@@ -69,8 +56,18 @@ def BuildSchema(table):
 
     return tuple(schema)
 
-def SQLToBQBatch(table, limit=0):
-    logging.info("****************************************************")
+
+@click.command()
+@click.option('-h', '--host', default='127.0.0.1', help='MySQL hostname')
+@click.option('-d', '--database', required=True, help='MySQL database')
+@click.option('-u', '--user', default='root', help='MySQL user')
+@click.option('-p', '--password', default='', help='MySQL password')
+@click.option('-t', '--table', required=True, help='MySQL table')
+@click.option('-i', '--projectid', required=True, help='Google BigQuery Project ID')
+@click.option('-n', '--dataset', required=True, help='Google BigQuery Dataset name')
+@click.option('-l', '--limit',  default=0, help='max num of rows to load')
+@click.option('-s', '--batch_size',  default=1000, help='max num of rows to load')
+def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limit, batch_size):
     logging.info("Starting SQLToBQBatch. Got: Table: %s, Limit: %i" % (table, limit))
 
     # Instantiates a client
@@ -78,7 +75,10 @@ def SQLToBQBatch(table, limit=0):
 
     try:
         # Prepares the new dataset
-        dataset = bigquery_client.dataset(DATASET_ID)
+        if dataset == '':
+            dataset = database
+
+        dataset = bigquery_client.dataset(dataset)
 
         # Creates the new dataset
         dataset.create()
@@ -93,7 +93,7 @@ def SQLToBQBatch(table, limit=0):
 
     try:
         bq_table = dataset.table(table)
-        bq_table.schema = BuildSchema(table)
+        bq_table.schema = BuildSchema(host, database, user, password, table)
         bq_table.create()
 
         logging.info("Added Table")
@@ -104,14 +104,13 @@ def SQLToBQBatch(table, limit=0):
         else:
             logging.error("Error creating table: %s Error", str(e))
 
-    conn = Connect()
+    conn = Connect(host, database, user, password)
     cursor = conn.cursor()
 
     logging.info("Starting load loop")
     count = -1
     cur_pos = 0
     total = 0
-    batch_size = 1000
 
     while count != 0 and (cur_pos < limit or limit == 0):
         count = 0
@@ -139,11 +138,16 @@ def SQLToBQBatch(table, limit=0):
             cur_pos += batch_size
             total += count
             logging.info("Done %i, Total: %i", count, total)
-            #if "insertErrors" in insertResponse:
-            #    logging.error("Error inserting data index: %i", insertResponse["insertErrors"]["index"])
-            #    for error in insertResponse["insertErrors"]["errors"]:
-            #        logging.error(error)
         else:
             logging.info("No more rows")
 
-SQLToBQBatch('videos')
+
+if __name__ == '__main__':
+    ## set logging
+    logging.basicConfig(level=logging.ERROR)
+
+    ## set env key to authenticate application
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "%s/%s" % (os.path.dirname(os.path.abspath(__file__)), 'google_key.json')
+
+    ## run the command
+    SQLToBQBatch()
