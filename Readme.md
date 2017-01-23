@@ -24,7 +24,7 @@ To configure it, run:
 gcloud init
 ```
 
-To authenticate you app you can create a service account key and place it in this folder.
+To authenticate you app you can create a service account key, name it `google_key.json` and place it in this folder.
 
 ## Install dependencies
 I would recommend to use a virtualenv. Run the following command to install all dependencies using pip:
