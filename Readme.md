@@ -20,3 +20,8 @@ gcloud init
 ```
 
 create service account key and place it in this folder
+
+
+## TODO
+ - use async load?
+ - adjust bucket-size
