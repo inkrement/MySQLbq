@@ -7,6 +7,7 @@ import os
 from MySQLdb.converters import conversions
 import click
 import MySQLdb.cursors
+from google.cloud.exceptions import ServiceUnavailable
 
 bqTypeDict = { 'int' : 'INTEGER',
                'varchar' : 'STRING',
@@ -60,13 +61,22 @@ def BuildSchema(host, database, user, password, table):
     return tuple(schema)
 
 
-def bq_load(table, data):
+def bq_load(table, data, max_retries=5):
     logging.info("Sending request")
-    insertResponse = table.insert_data(data)
+    inserted_successfully = False
+    num_tries = 0
 
-    for row in insertResponse:
-        if 'errors' in row:
-            logging.error('not able to upload data: %s', row['errors'])
+    while not inserted_successfully and num_tries < max_retries:
+        try:
+            insertResponse = table.insert_data(data)
+            inserted_successfully = True
+        except ServiceUnavailable as e:
+            num_tries += 1
+            logging.error('insert failed with exception trying again retry %d', num_tries )
+        except Exception as e:
+            for row in insertResponse:
+                if 'errors' in row:
+                    logging.error('not able to upload data: %s', row['errors'])
 
 @click.command()
 @click.option('-h', '--host', default='127.0.0.1', help='MySQL hostname')
