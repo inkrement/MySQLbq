@@ -146,7 +146,7 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
 
 if __name__ == '__main__':
     ## set logging
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.ERROR)
 
     ## set env key to authenticate application
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "%s/%s" % (os.path.dirname(os.path.abspath(__file__)), 'google_key.json')
