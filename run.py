@@ -63,21 +63,25 @@ def BuildSchema(host, database, user, password, table):
 
 def bq_load(table, data, max_retries=5):
     logging.info("Sending request")
-    inserted_successfully = False
+    uploaded_successfully = False
     num_tries = 0
 
-    while not inserted_successfully and num_tries < max_retries:
+    while not uploaded_successfully and num_tries < max_retries:
         try:
             insertResponse = table.insert_data(data)
-            inserted_successfully = True
+
+            for row in insertResponse:
+                if 'errors' in row:
+                    logging.error('not able to upload data: %s', row['errors'])
+
+            uploaded_successfully = True
         except ServiceUnavailable as e:
             num_tries += 1
             logging.error('insert failed with exception trying again retry %d', num_tries )
         except Exception as e:
             num_tries += 1
-            for row in insertResponse:
-                if 'errors' in row:
-                    logging.error('not able to upload data: %s', row['errors'])
+            logging.error('not able to upload data: %s', str(e) )
+
 
 @click.command()
 @click.option('-h', '--host', default='127.0.0.1', help='MySQL hostname')
@@ -90,8 +94,15 @@ def bq_load(table, data, max_retries=5):
 @click.option('-l', '--limit',  default=0, help='max num of rows to load')
 @click.option('-s', '--batch_size',  default=1000, help='max num of rows to load')
 @click.option('-k', '--key',  default='google_key.json', help='Location of google service account key (relative to current working dir)')
-def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limit, batch_size, key):
-    logging.info("Starting SQLToBQBatch. Got: Table: %s, Limit: %i" % (table, limit))
+@click.option('-v', '--verbose',  default=0, count=True, help='verbose')
+def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limit, batch_size, key, verbose):
+    # set to max verbose level
+    verbose = verbose if verbose < 3 else 3
+    loglevel = logging.ERROR - (10 * verbose)
+
+    logging.basicConfig(level=loglevel)
+
+    logging.info("Starting SQLToBQBatch. Got: Table: %s, Limit: %i", table, limit)
 
     ## set env key to authenticate application
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "%s/%s" % (os.getcwd(), key)
@@ -116,13 +127,13 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
         bq_table.schema = BuildSchema(host, database, user, password, table)
         bq_table.create()
 
-        logging.info("Added Table")
+        logging.info("Added Table %s", table)
     except Exception, e:
         logging.info(e)
         if ("Already Exists: " in str(e)):
-            logging.info("Table already exists")
+            logging.info("Table %s already exists", table)
         else:
-            logging.error("Error creating table: %s Error", str(e))
+            logging.error("Error creating table %s: %s Error", table, str(e))
 
     conn = Connect(host, database, user, password)
     cursor = conn.cursor()
@@ -150,8 +161,5 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
 
 
 if __name__ == '__main__':
-    ## set logging
-    logging.basicConfig(level=logging.ERROR)
-
     ## run the command
     SQLToBQBatch()
