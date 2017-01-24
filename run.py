@@ -89,8 +89,12 @@ def bq_load(table, data, max_retries=5):
 @click.option('-n', '--dataset', required=True, help='Google BigQuery Dataset name')
 @click.option('-l', '--limit',  default=0, help='max num of rows to load')
 @click.option('-s', '--batch_size',  default=1000, help='max num of rows to load')
-def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limit, batch_size):
+@click.option('-k', '--key',  default='google_key.json', help='Location of google service account key (relative to current working dir)')
+def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limit, batch_size, key):
     logging.info("Starting SQLToBQBatch. Got: Table: %s, Limit: %i" % (table, limit))
+
+    ## set env key to authenticate application
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "%s/%s" % (os.getcwd(), key)
 
     # Instantiates a client
     bigquery_client = bigquery.Client()
@@ -148,9 +152,6 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
 if __name__ == '__main__':
     ## set logging
     logging.basicConfig(level=logging.ERROR)
-
-    ## set env key to authenticate application
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "%s/%s" % (os.path.dirname(os.path.abspath(__file__)), 'google_key.json')
 
     ## run the command
     SQLToBQBatch()
