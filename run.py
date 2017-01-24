@@ -36,7 +36,8 @@ def Connect(host, database, user, password):
     ## fix conversion. datetime as str and not datetime object
     conv=conversions.copy()
     conv[12]=conv_date_to_timestamp
-    return MySQLdb.connect(host=host, db=database, user=user, passwd=password, conv=conv, cursorclass=MySQLdb.cursors.SSCursor)
+    return MySQLdb.connect(host=host, db=database, user=user, passwd=password,
+        conv=conv, cursorclass=MySQLdb.cursors.SSCursor, charset='utf8', use_unicode=True)
 
 
 def BuildSchema(host, database, user, password, table):
