@@ -148,7 +148,8 @@ def SQLToBQBatch(host, database, user, password, table, projectid, dataset, limi
     for row in cursor:
         count += 1
 
-        if limit != 0 and count > limit:
+        if limit != 0 and count >= limit:
+            logging.info("limit of %d rows reached", limit)
             break
 
         cur_batch.append(row)
