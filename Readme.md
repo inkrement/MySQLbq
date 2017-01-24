@@ -3,7 +3,7 @@ This is a CLI tool (written in Python) that allows you to load your data from My
 
 ## Requirements
 
- * libmysqlclient-dev (on ubuntu just run: `sudo apt install libmysqlclient-dev`) 
+ * libmysqlclient-dev (on ubuntu just run: `sudo apt install libmysqlclient-dev`)
  * Google Cloud SDK
  * Python
 
@@ -24,7 +24,7 @@ To configure it, run:
 gcloud init
 ```
 
-To authenticate you app you can create a service account key, name it `google_key.json` and place it in this folder.
+To authenticate your app create a service account key, name it `google_key.json` and place it in this folder.
 
 ## Install dependencies
 I would recommend to use a virtualenv. Run the following command to install all dependencies using pip:
@@ -32,6 +32,28 @@ I would recommend to use a virtualenv. Run the following command to install all 
 ```
 pip install -r requirements.txt
 ```
+## Pypy
+I successfully used it with pypy.
+```
+sudo apt install pypy pypy-dev
+```
+
+```
+virtualenv -p pypy ve
+```
+## Benchmarks
+
+### Small table with 14719 rows
+
+|      | cpython  | pypy     |
+|------|----------|----------|
+| real | 0m6.964s | 0m9.186s |
+| user | 0m0.888s | 0m2.500s |
+| sys  | 0m0.152s | 0m0.244s |
+
+### 1M row subset of Text-Table (22 040 759 rows, ~ 2,6 GiB)
+
+
 
 
 ## Usage
@@ -55,3 +77,4 @@ Options:
 ## TODO
  - use async load?
  - adjust bucket-size
+ - add support for other data types
